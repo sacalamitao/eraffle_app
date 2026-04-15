@@ -7,4 +7,7 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+
+  # config/routes.rb
+  get '/me', to: 'profiles#show_me'
 end

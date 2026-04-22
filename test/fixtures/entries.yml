@@ -1,0 +1,13 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  raffle: one
+  participant: one
+  source_type: MyString
+  metadata: 
+
+two:
+  raffle: two
+  participant: two
+  source_type: MyString
+  metadata: 

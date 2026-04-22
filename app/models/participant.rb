@@ -6,4 +6,8 @@ class Participant < ApplicationRecord
   has_many :entries, dependent: :destroy
 
   validates :display_name, presence: true
+
+  def entry_count
+    entries.count
+  end
 end

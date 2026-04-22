@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_162251) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_175519) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -28,6 +28,17 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_162251) do
   enable_extension "supabase_vault"
   enable_extension "uuid-ossp"
 
+  create_table "entries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "raffle_id", null: false
+    t.uuid "participant_id", null: false
+    t.string "source_type", default: "check_in", null: false
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["participant_id"], name: "index_entries_on_participant_id"
+    t.index ["raffle_id"], name: "index_entries_on_raffle_id"
+  end
+
   create_table "participants", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "raffle_id", null: false
     t.uuid "profile_id"
@@ -39,6 +50,18 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_162251) do
     t.index ["profile_id"], name: "index_participants_on_profile_id"
     t.index ["raffle_id", "profile_id"], name: "index_participants_on_raffle_id_and_profile_id", unique: true, where: "(profile_id IS NOT NULL)"
     t.index ["raffle_id"], name: "index_participants_on_raffle_id"
+  end
+
+  create_table "prizes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "raffle_id", null: false
+    t.string "title", null: false
+    t.text "description"
+    t.integer "quantity", default: 1
+    t.integer "rank", default: 1
+    t.string "draw_style", default: "reveal"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["raffle_id"], name: "index_prizes_on_raffle_id"
   end
 
   create_table "profiles", id: :uuid, default: nil, force: :cascade do |t|
@@ -70,8 +93,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_162251) do
     t.index ["slug"], name: "index_raffles_on_slug", unique: true
   end
 
+  add_foreign_key "entries", "participants"
+  add_foreign_key "entries", "raffles"
   add_foreign_key "participants", "profiles"
   add_foreign_key "participants", "raffles"
+  add_foreign_key "prizes", "raffles"
   add_foreign_key "profiles", "auth.users", column: "id", name: "fk_profiles_users", on_delete: :cascade
   add_foreign_key "raffles", "profiles", column: "facilitator_id"
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_15_112336) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_125940) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -30,7 +30,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_15_112336) do
 
   create_table "profiles", id: :uuid, default: nil, force: :cascade do |t|
     t.text "email"
-    t.text "role", default: "participant"
     t.integer "tickets_count", default: 0
     t.text "external_identifier"
     t.jsonb "metadata", default: {}
@@ -39,8 +38,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_15_112336) do
     t.string "first_name"
     t.string "last_name"
     t.index ["email"], name: "index_profiles_on_email", unique: true
-    t.check_constraint "role = ANY (ARRAY['admin'::text, 'facilitator'::text, 'participant'::text])", name: "role_check"
+  end
+
+  create_table "raffles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "facilitator_id", null: false
+    t.string "title", null: false
+    t.string "slug", null: false
+    t.string "category", default: "private"
+    t.string "status", default: "draft"
+    t.string "access_code"
+    t.boolean "must_be_present", default: false
+    t.integer "max_entries_per_user", default: 1
+    t.jsonb "branding_settings", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["access_code"], name: "index_raffles_on_access_code", unique: true
+    t.index ["facilitator_id"], name: "index_raffles_on_facilitator_id"
+    t.index ["slug"], name: "index_raffles_on_slug", unique: true
   end
 
   add_foreign_key "profiles", "auth.users", column: "id", name: "fk_profiles_users", on_delete: :cascade
+  add_foreign_key "raffles", "profiles", column: "facilitator_id"
 end

@@ -1,33 +1,47 @@
-# 📘 eRaffle Official Developer Documentation
+# 📘 eRaffle Technical Documentation
 
-**Architecture:** Supabase Auth & Rails Profile Integration  
+**Architecture:** Supabase Auth + Rails API + Relational ERD (Web-and-Spoke)  
 **Author:** Jhun Codevelopr  
-**Date:** April 2026
+**Updated:** April 2026
 
 ---
 
-## 1) Core Philosophy: "No-User-Model" Rails
+## 1) Core Philosophy
 
-Unlike traditional Rails apps, this architecture does **not** use a local `User` model.
+The platform follows a **No-Local-User-Model** approach in Rails for authentication, while using a **Relational Web-and-Spoke** domain model for raffle operations.
 
-### Why this approach?
+- **Supabase Auth** handles identity (signup, login, JWT issuance).
+- **Rails + Postgres** handle business data and raffle logic.
+- **Raffle is the center (the “sun”)** of the data model.
 
-- **Identity vs. Data:**
-  - **Identity** (email/password/login) is handled by **Supabase Auth**.
-  - **Data** (tickets, names, roles) lives in Rails business logic.
-- **Reduced security risk:** Rails never handles raw passwords; it only trusts verified UUIDs.
-- **Efficiency:** Avoids Devise/Bcrypt overhead and keeps the API lean.
+This avoids overloading a single `User` concept with too much logic and keeps the system modular and scalable.
 
 ---
 
-## 2) Rails Schema Configuration
+## 2) Authentication and Identity Design
 
-The `profiles` table is the heart of application data. It uses a UUID primary key so IDs match Supabase exactly.
+### Why no local `User` model?
+
+- **Identity vs. Business Data Separation**
+  - Identity: Supabase Auth
+  - Business entities: Profiles, Raffles, Participants, Entries, Prizes, Winners
+- **Security**
+  - Rails does not process raw passwords.
+  - Rails verifies JWT signatures locally.
+- **Operational reliability**
+  - DB trigger creates profiles even if Rails is temporarily unavailable.
+
+### Current identity table: `profiles`
+
+`profiles` acts as a **Universal Actor** record (host, facilitator, player, etc.).
+
+---
+
+## 3) Existing Rails Schema Snippet (`profiles`)
 
 ```ruby
 create_table "profiles", id: :uuid, default: nil, force: :cascade do |t|
   t.text "email"
-  t.text "role", default: "participant"
   t.integer "tickets_count", default: 0
   t.string "first_name"
   t.string "last_name"
@@ -36,38 +50,32 @@ create_table "profiles", id: :uuid, default: nil, force: :cascade do |t|
   t.datetime "updated_at", null: false
 
   t.index ["email"], name: "index_profiles_on_email", unique: true
-  t.check_constraint "role = ANY (ARRAY['admin'::text, 'facilitator'::text, 'participant'::text])", name: "role_check"
 end
 ```
 
 ---
 
-## 3) Automated Sync via SQL Trigger
+## 4) Automated Profile Sync (Supabase → Public Schema)
 
-To bridge Supabase signup with Rails profile creation, use a PostgreSQL trigger.
+### Flow
 
-This runs **inside the database**, so profile creation is reliable even if Rails is down.
+1. User signs up via Supabase.
+2. `auth.users` receives a new record.
+3. Postgres trigger calls `handle_new_user()`.
+4. Insert is performed into `public.profiles`.
 
-### Logic flow
-
-1. User signs up via frontend/Supabase.
-2. `auth.users` receives a new row.
-3. Trigger fires `handle_new_user()`.
-4. Data is mapped into `public.profiles`.
-
-### SQL
+### SQL Trigger
 
 ```sql
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, first_name, last_name, role, tickets_count, created_at, updated_at)
+  INSERT INTO public.profiles (id, email, first_name, last_name, tickets_count, created_at, updated_at)
   VALUES (
     new.id,
     new.email,
     new.raw_user_meta_data->>'first_name',
     new.raw_user_meta_data->>'last_name',
-    'participant',
     0,
     now(),
     now()
@@ -83,17 +91,14 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 
 ---
 
-## 4) Auth Handshake (JWT + JWKS)
+## 5) Auth Handshake (JWT + JWKS)
 
-Rails does not call Supabase on every request. It verifies JWTs locally using asymmetric cryptography.
+Rails verifies tokens without calling Supabase on every request.
 
-### Verification steps
-
-1. **Fetch keys:** Rails fetches Supabase JWKS from:
-   - `https://<id>.supabase.co/auth/v1/.well-known/jwks.json`
-2. **Decode token:** Validate JWT signature locally using `jwt` gem + `ES256`.
-3. **Identify user:** Read `sub` claim (Supabase UUID).
-4. **Authorize:** Set current profile from UUID.
+1. Fetch Supabase JWKS.
+2. Verify JWT signature locally (`ES256`).
+3. Read `sub` claim.
+4. Resolve profile:
 
 ```ruby
 @current_profile = Profile.find(payload['sub'])
@@ -101,22 +106,97 @@ Rails does not call Supabase on every request. It verifies JWTs locally using as
 
 ---
 
-## 5) Security Constraints
+## 6) Recommended ERD Model (Senior Dev + BA Recommendation)
 
-- **SECURITY DEFINER:**
-  - Trigger function runs with definer privileges.
-  - Allows initial `profiles` insert even before user-specific RLS permissions apply.
-- **Role check constraint:**
-  - Enforces valid roles only: `admin`, `facilitator`, `participant`.
-- **JWT audience check:**
-  - Rails must strictly verify `aud == authenticated`.
+### Recommendation Summary
+
+Use a **Relational Web-and-Spoke model** with **Raffles as the central node**.
+
+By splitting **Participants** (the person’s participation in a raffle) from **Entries** (the raffle tickets/chances), the model supports all three pillars:
+
+- **Private:** 1 Participant = 1 Entry (Check-in)
+- **Influencer:** 1 Participant = 1 Entry (Verified Social)
+- **Brand:** 1 Participant = Many Entries (Sachet Scans)
 
 ---
 
-## 6) Metadata Mapping & Frontend Implementation
+## 7) ERD Component Breakdown
 
-During signup, the frontend must pass names in `options.data`.  
-This is the source used by the DB trigger for `first_name` and `last_name`.
+### 7.1 Profiles (Existing)
+
+- **Role:** The Identity
+- **Key Change:** Treat as a **Universal Actor**
+- **Important Note:** Profile no longer owns raffle behavior directly; it is referenced by raffle-domain tables.
+
+### 7.2 Raffles (The Container)
+
+- **Role:** The Room / Event
+- **Relationship:** Belongs to a `Profile` (Facilitator)
+- **Key Logic:** Holds raffle `category` (`private`, `public`, `brand`)
+  - Frontend uses category to decide CTA behavior:
+    - Show **Join** for one-entry flows
+    - Show **Scan Sachet** for accumulative-entry flows
+
+### 7.3 Participants (The Connection)
+
+- **Role:** The Guest List
+- **Relationship:** Join table between `profiles` and `raffles`
+- **Key Logic:** Tracks `checked_in` state
+  - Example: 500 registered, 200 checked-in → draw only includes 200 eligible participants.
+
+### 7.4 Entries (The Chance)
+
+- **Role:** The Physical Tickets
+- **Relationship:** Belongs to a `Participant`
+- **Key Logic:** Enables weighted chance for loyalty/brand mechanics
+  - In accumulative raffles, each successful sachet scan creates a new `entry` row.
+  - If draw selects by `entry_id`, 10 entries = ~10x chance.
+
+### 7.5 Prizes (The Goal)
+
+- **Role:** The Inventory
+- **Key Logic:** Include `draw_style` per prize
+  - Example:
+    - Minor prizes → **Burst** (multi-winner draw)
+    - Grand prize → **Elimination**
+
+### 7.6 Winners (The Broadcast)
+
+- **Role:** The Result Ledger
+- **Relationship:** Links `participant` to `prize`
+- **Key Logic:** This is the event table for live display and post-draw audit
+  - When a winner row is inserted, UI listeners (e.g., Supabase realtime) can trigger confetti/name reveal.
+
+---
+
+## 8) Why This Flow Is Recommended
+
+### Scalability
+
+Adding a new pillar (example: **Charity Auction**) does not require a schema rewrite. Add new raffle categories/behaviors while preserving the same core entities.
+
+### Audit Trail
+
+`winners` provides a permanent record of:
+
+- who won,
+- what prize was won,
+- claim lifecycle (e.g., pending, claimed, shipped).
+
+This is critical for compliance and logistics in brand campaigns.
+
+### Performance + Security
+
+With Supabase/Postgres, enforce Row Level Security (RLS):
+
+- participant can view only their own entries,
+- facilitator can view entries for raffles they own/manage.
+
+---
+
+## 9) Frontend Signup Metadata Requirement
+
+During signup, send first/last name in `options.data` so DB trigger can map values into `profiles`.
 
 ```javascript
 const { data, error } = await supabase.auth.signUp({
@@ -133,65 +213,31 @@ const { data, error } = await supabase.auth.signUp({
 
 ---
 
-## 7) Testing & Debugging (Postman Guide)
+## 10) Testing Quick Guide (Postman)
 
-### A) Test user creation (signup)
+### A. Sign up
 
-- **Method:** `POST`
-- **URL:** `https://your-project-id.supabase.co/auth/v1/signup`
-- **Headers:** `apikey: YOUR_ANON_KEY`
-- **Body:** `raw` → `JSON`
+- `POST https://<project-id>.supabase.co/auth/v1/signup`
+- Headers: `apikey: YOUR_ANON_KEY`
 
-```json
-{
-  "email": "test@example.com",
-  "password": "password123",
-  "data": { "first_name": "Jhun", "last_name": "Dev" }
-}
-```
+### B. Login and obtain access token
 
-### B) User login (sign in)
-
-Use this to get a fresh JWT (`access_token`).
-
-- **Method:** `POST`
-- **URL:** `https://<your-project-id>.supabase.co/auth/v1/token?grant_type=password`
-- **Headers:**
-  - `apikey: YOUR_SUPABASE_ANON_KEY`
+- `POST https://<project-id>.supabase.co/auth/v1/token?grant_type=password`
+- Headers:
+  - `apikey: YOUR_ANON_KEY`
   - `Content-Type: application/json`
-- **Body (JSON):**
 
-```json
-{
-  "email": "jhun.test@example.com",
-  "password": "password123"
-}
-```
+### C. Verify Rails protected endpoint
 
-- **Expected response:** Copy the `access_token` from the JSON response.
-
-### C) Test Rails handshake (`/me`) in Postman
-
-- **Method:** `GET`
-- **URL:** `http://localhost:3000/me`
-- **Authorization tab:**
-  - Type: `Bearer Token`
-  - Token: paste `access_token` from signup/login
-- **Headers tab:** Postman auto-generates `Authorization: Bearer <your_token>`
-- **Send:** Click **Send**
-
-### D) Rails auth test via header
-
-- **Method:** `GET`
-- **URL:** `http://localhost:3000/me`
-- **Header:** `Authorization: Bearer <token>`
+- `GET http://localhost:3000/me`
+- Header: `Authorization: Bearer <access_token>`
 
 ---
 
-## Notes
+## 11) Final Notes
 
-This setup keeps Rails **stateless**:
+This design keeps Rails stateless, domain-driven, and raffle-centric:
 
-- No server-side session storage needed.
-- If JWT is valid and UUID exists in `profiles`, the user is authenticated.
-
+- Auth remains externalized and secure.
+- Raffle logic remains relational and extensible.
+- Real-time winner broadcasting and strong auditability are first-class by design.

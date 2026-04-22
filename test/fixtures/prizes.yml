@@ -1,0 +1,19 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  raffle: one
+  title: MyString
+  description: MyText
+  quantity: 1
+  rank: 1
+  draw_style: MyString
+  metadata: 
+
+two:
+  raffle: two
+  title: MyString
+  description: MyText
+  quantity: 1
+  rank: 1
+  draw_style: MyString
+  metadata: 

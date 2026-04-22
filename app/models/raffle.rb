@@ -3,6 +3,7 @@ class Raffle < ApplicationRecord
   has_many :participants, dependent: :destroy
   has_many :entries, dependent: :destroy
   has_many :profiles, through: :participants
+  has_many :prizes, dependent: :destroy
 
   validates :title, presence: true
   validates :category, inclusion: { in: %w[private influencer brand] }

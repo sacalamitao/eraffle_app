@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_125940) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_162251) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -27,6 +27,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_125940) do
   enable_extension "plpgsql"
   enable_extension "supabase_vault"
   enable_extension "uuid-ossp"
+
+  create_table "participants", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "raffle_id", null: false
+    t.uuid "profile_id"
+    t.string "display_name", null: false
+    t.boolean "checked_in", default: false
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["profile_id"], name: "index_participants_on_profile_id"
+    t.index ["raffle_id", "profile_id"], name: "index_participants_on_raffle_id_and_profile_id", unique: true, where: "(profile_id IS NOT NULL)"
+    t.index ["raffle_id"], name: "index_participants_on_raffle_id"
+  end
 
   create_table "profiles", id: :uuid, default: nil, force: :cascade do |t|
     t.text "email"
@@ -57,6 +70,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_125940) do
     t.index ["slug"], name: "index_raffles_on_slug", unique: true
   end
 
+  add_foreign_key "participants", "profiles"
+  add_foreign_key "participants", "raffles"
   add_foreign_key "profiles", "auth.users", column: "id", name: "fk_profiles_users", on_delete: :cascade
   add_foreign_key "raffles", "profiles", column: "facilitator_id"
 end

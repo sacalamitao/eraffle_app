@@ -1,6 +1,8 @@
 class Raffle < ApplicationRecord
-  belongs_to :facilitator, class_name: 'Profile'
+  belongs_to :facilitator, class_name: 'Profile', foreign_key: 'facilitator_id'
   has_many :participants, dependent: :destroy
+  has_many :entries, dependent: :destroy
+  has_many :profiles, through: :participants
 
   validates :title, presence: true
   validates :category, inclusion: { in: %w[private influencer brand] }

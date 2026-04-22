@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  raffle: one
+  profile: one
+  display_name: MyString
+  checked_in: false
+  metadata: 
+
+two:
+  raffle: two
+  profile: two
+  display_name: MyString
+  checked_in: false
+  metadata: 

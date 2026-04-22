@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  prize: one
+  participant: one
+  entry: one
+  is_revealed: false
+  claimed_at: 2026-04-23 02:09:11
+
+two:
+  prize: two
+  participant: two
+  entry: two
+  is_revealed: false
+  claimed_at: 2026-04-23 02:09:11

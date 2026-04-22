@@ -4,6 +4,8 @@ class Participant < ApplicationRecord
   belongs_to :profile, optional: true
 
   has_many :entries, dependent: :destroy
+  has_many :winners
+  has_many :prizes, through: :winners
 
   validates :display_name, presence: true
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_175519) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_180911) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -93,6 +93,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_175519) do
     t.index ["slug"], name: "index_raffles_on_slug", unique: true
   end
 
+  create_table "winners", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "prize_id", null: false
+    t.uuid "participant_id", null: false
+    t.uuid "entry_id", null: false
+    t.boolean "is_revealed", default: false
+    t.datetime "claimed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entry_id"], name: "index_winners_on_entry_id"
+    t.index ["participant_id"], name: "index_winners_on_participant_id"
+    t.index ["prize_id"], name: "index_winners_on_prize_id"
+  end
+
   add_foreign_key "entries", "participants"
   add_foreign_key "entries", "raffles"
   add_foreign_key "participants", "profiles"
@@ -100,4 +113,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_175519) do
   add_foreign_key "prizes", "raffles"
   add_foreign_key "profiles", "auth.users", column: "id", name: "fk_profiles_users", on_delete: :cascade
   add_foreign_key "raffles", "profiles", column: "facilitator_id"
+  add_foreign_key "winners", "entries"
+  add_foreign_key "winners", "participants"
+  add_foreign_key "winners", "prizes"
 end

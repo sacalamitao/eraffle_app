@@ -1,4 +1,4 @@
-# 📘 eRaffle Technical Documentation
+# 📘 eRaffle Technical Documentation - RaffItAll
 
 **Architecture:** Supabase Auth + Rails API + Relational ERD (Web-and-Spoke)  
 **Author:** Jhun Codevelopr  
